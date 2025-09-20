@@ -198,7 +198,7 @@ const { FollowRequest, Message, Notification, Story, Post, User } = defineSchema
 
 
 app.use(cors({
-  origin: 'https://bright-puppy-b75c1a.netlify.app',
+  origin: 'https://chipper-flan-50143b.netlify.app/',
   credentials: true
 }));
 
