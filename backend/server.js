@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 5000;
 
 // --- Configuration ---
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+
 
 // --- Ensure uploads directory exists ---
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -198,7 +198,7 @@ const { FollowRequest, Message, Notification, Story, Post, User } = defineSchema
 
 
 app.use(cors({
-  origin: 'http://localhost:5173', // ✅ EXACT origin — NOT '*'
+  origin: 'https://bright-puppy-b75c1a.netlify.app',
   credentials: true
 }));
 
@@ -1268,6 +1268,5 @@ setInterval(async () => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📁 Uploads directory: ${UPLOADS_DIR}`);
-  console.log(`🌐 CORS enabled for: ${CLIENT_URL}`);
   
 });
