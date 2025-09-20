@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://thriving-rabanadas-12770e.netlify.app/sitemap.xml
