@@ -197,10 +197,7 @@ const defineSchemas = () => {
 const { FollowRequest, Message, Notification, Story, Post, User } = defineSchemas();
 
 
-app.use(cors({
-  origin: 'https://chipper-flan-50143b.netlify.app/',
-  credentials: true
-}));
+app.use(cors());
 
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
