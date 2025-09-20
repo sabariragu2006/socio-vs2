@@ -197,7 +197,16 @@ const defineSchemas = () => {
 const { FollowRequest, Message, Notification, Story, Post, User } = defineSchemas();
 
 
-app.use(cors());
+// Update your CORS configuration
+app.use(cors({
+  origin: [
+    'https://thriving-rabanadas-12770e.netlify.app/',
+    'http://localhost:3000', // For local development
+    'http://localhost:5173'  // For Vite development
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
