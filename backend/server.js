@@ -200,7 +200,7 @@ const { FollowRequest, Message, Notification, Story, Post, User } = defineSchema
 // Update your CORS configuration
 app.use(cors({
   origin: [
-    'https://thriving-rabanadas-12770e.netlify.app/',
+    'https://thriving-rabanadas-12770e.netlify.app',
     'http://localhost:3000', // For local development
     'http://localhost:5173'  // For Vite development
   ],
