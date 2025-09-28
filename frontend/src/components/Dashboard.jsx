@@ -590,7 +590,9 @@ const Dashboard = ({ user, onLogout }) => {
 
   return (
     <>
-      {/* SEO Meta Tags */}
+      <Helmet>
+        <title>Paazhka Dashboard - Your Data at a Glance</title>
+        <meta name="description" content="Paazhka Dashboard lets you manage your data efficiently." />
       <title>SocialSphere - Connect, Share, Discover</title>
       <meta name="description" content="Join SocialSphere to connect with friends, share your moments, and discover new content. A social media platform for everyone." />
       <meta name="keywords" content="social media, social network, connect, share, discover, friends, posts, stories" />
@@ -601,7 +603,8 @@ const Dashboard = ({ user, onLogout }) => {
       {/* Bootstrap CSS & Icons */}
       <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet" />
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" />
-      
+            </Helmet>{/* SEO Meta Tags */}
+
       {/* Prevent horizontal scroll globally */}
       <style>{`
         html, body, #root {
