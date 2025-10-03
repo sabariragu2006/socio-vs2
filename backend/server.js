@@ -6,14 +6,13 @@ const fs = require('fs');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const morgan = require('morgan');
-require('dotenv').config(); // ✅ Load .env file
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // --- Configuration ---
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
-
 
 // --- Ensure uploads directory exists ---
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -196,13 +195,13 @@ const defineSchemas = () => {
 
 const { FollowRequest, Message, Notification, Story, Post, User } = defineSchemas();
 
-
 // Update your CORS configuration
 app.use(cors({
   origin: [
+    'https://paazhka.netlify.app',
     'https://thriving-rabanadas-12770e.netlify.app',
-    'http://localhost:3000', // For local development
-    'http://localhost:5173'  // For Vite development
+    'http://localhost:3000',
+    'http://localhost:5173'
   ],
   credentials: true,
   optionsSuccessStatus: 200
@@ -645,6 +644,23 @@ const setupRoutes = () => {
   });
 
   // --- Post Routes ---
+  // PUBLIC POSTS ENDPOINT - Must come BEFORE other post routes with parameters
+  app.get('/posts/public', async (req, res) => {
+    try {
+      const posts = await Post.find()
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean();
+
+      const formattedPosts = posts.map(post => helpers.formatPost(post, null));
+
+      res.json({ posts: formattedPosts });
+    } catch (err) {
+      console.error('GET PUBLIC POSTS ERROR:', err);
+      res.status(500).json({ message: 'Server error.' });
+    }
+  });
+
   app.get('/posts/following/:userId', async (req, res) => {
     try {
       const { userId } = req.params;
@@ -674,6 +690,32 @@ const setupRoutes = () => {
     }
   });
 
+ // Fix for line 657 - Remove the space in isValidObjectId
+
+app.get('/posts/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { currentUserId } = req.query;
+    
+    // FIX: Remove space between "isValid" and "ObjectId"
+    if (!helpers.isValidObjectId(userId)) {  // ✅ Fixed
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
+
+    const posts = await Post.find({ 'author._id': userId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const formattedPosts = posts.map(post => 
+      helpers.formatPost(post, currentUserId)
+    );
+
+    res.json({ posts: formattedPosts });
+  } catch (err) {
+    console.error('GET USER POSTS ERROR:', err);
+    res.status(500).json({ message: 'Server error.' });
+  }
+});
   app.post('/add-post', upload.single('postImage'), async (req, res) => {
     try {
       const { userId, content } = req.body;
@@ -819,370 +861,6 @@ const setupRoutes = () => {
     }
   });
 
-  app.get('/posts/user/:userId', async (req, res) => {
-    try {
-      const { userId } = req.params;
-      const { currentUserId } = req.query;
-      
-      if (!helpers.isValidObjectId(userId)) {
-        return res.status(400).json({ message: 'Invalid user ID.' });
-      }
-
-      const posts = await Post.find({ 'author._id': userId })
-        .sort({ createdAt: -1 })
-        .lean();
-
-      const formattedPosts = posts.map(post => 
-        helpers.formatPost(post, currentUserId)
-      );
-
-      res.json({ posts: formattedPosts });
-    } catch (err) {
-      console.error('GET USER POSTS ERROR:', err);
-      res.status(500).json({ message: 'Server error.' });
-    }
-  });
-
-  // --- Story Routes ---
-  app.post('/upload-story/:userId', upload.single('story'), async (req, res) => {
-    try {
-      const { userId } = req.params;
-      if (!req.file) {
-        return res.status(400).json({ message: 'Story media is required.' });
-      }
-      if (!helpers.isValidObjectId(userId)) {
-        return res.status(400).json({ message: 'Invalid user ID.' });
-      }
-
-      const user = await User.findById(userId).lean();
-      if (!user) {
-        return res.status(404).json({ message: 'User not found.' });
-      }
-
-      const mediaType = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
-
-      const newStory = new Story({
-        media: `/uploads/${req.file.filename}`,
-        mediaType,
-        author: {
-          _id: user._id,
-          name: user.name,
-          profilePicture: user.profilePicture
-        }
-      });
-
-      await newStory.save();
-
-      await User.findByIdAndUpdate(userId, {
-        $push: { stories: newStory._id }
-      });
-
-      res.json({
-        message: 'Story uploaded',
-        story: helpers.formatStory(newStory, userId)
-      });
-    } catch (err) {
-      console.error('UPLOAD STORY ERROR:', err);
-      res.status(500).json({ message: 'Server error.' });
-    }
-  });
-
-  app.get('/stories/:userId', async (req, res) => {
-    try {
-      const { userId } = req.params;
-      if (!helpers.isValidObjectId(userId)) {
-        return res.status(400).json({ message: 'Invalid user ID.' });
-      }
-
-      const user = await User.findById(userId).lean();
-      if (!user) {
-        return res.status(404).json({ message: 'User not found.' });
-      }
-
-      const followingIds = [
-        ...(Array.isArray(user.following) ? user.following.map(id => id.toString()) : []),
-        userId
-      ];
-
-      const stories = await Story.find({
-        'author._id': { $in: followingIds },
-        expiresAt: { $gt: new Date() }
-      })
-      .sort({ createdAt: -1 })
-      .lean();
-
-      const formattedStories = stories.map(story => 
-        helpers.formatStory(story, userId)
-      );
-
-      res.json({ stories: formattedStories });
-    } catch (err) {
-      console.error('GET STORIES ERROR:', err);
-      res.status(500).json({ message: 'Server error.' });
-    }
-  });
-
-  app.post('/view-story', async (req, res) => {
-    try {
-      const { userId, storyId } = req.body;
-      if (!userId || !storyId) {
-        return res.status(400).json({ message: 'userId and storyId are required.' });
-      }
-      if (!helpers.isValidObjectId(userId) || !helpers.isValidObjectId(storyId)) {
-        return res.status(400).json({ message: 'Invalid IDs.' });
-      }
-
-      const story = await Story.findById(storyId);
-      if (!story) {
-        return res.status(404).json({ message: 'Story not found.' });
-      }
-
-      if (!story.viewers.includes(userId)) {
-        story.viewers.push(userId);
-        await story.save();
-      }
-
-      res.json({ message: 'Story viewed' });
-    } catch (err) {
-      console.error('VIEW STORY ERROR:', err);
-      res.status(500).json({ message: 'Server error.' });
-    }
-  });
-
-  // --- Message Routes ---
-  app.get('/conversations/:userId', async (req, res) => {
-    try {
-      const { userId } = req.params;
-      if (!helpers.isValidObjectId(userId)) {
-        return res.status(400).json({ message: 'Invalid user ID.' });
-      }
-
-      const conversations = await Message.aggregate([
-        {
-          $match: {
-            $or: [
-              { 'sender._id': new mongoose.Types.ObjectId(userId) },
-              { 'receiver._id': new mongoose.Types.ObjectId(userId) }
-            ]
-          }
-        },
-        {
-          $sort: { createdAt: -1 }
-        },
-        {
-          $group: {
-            _id: {
-              $cond: {
-                if: { $eq: ["$sender._id", new mongoose.Types.ObjectId(userId)] },
-                then: "$receiver._id",
-                else: "$sender._id"
-              }
-            },
-            name: {
-              $first: {
-                $cond: {
-                  if: { $eq: ["$sender._id", new mongoose.Types.ObjectId(userId)] },
-                  then: "$receiver.name",
-                  else: "$sender.name"
-                }
-              }
-            },
-            profilePicture: {
-              $first: {
-                $cond: {
-                  if: { $eq: ["$sender._id", new mongoose.Types.ObjectId(userId)] },
-                  then: "$receiver.profilePicture",
-                  else: "$sender.profilePicture"
-                }
-              }
-            },
-            lastMessage: { $first: "$text" },
-            lastMessageAt: { $first: "$createdAt" },
-            unreadCount: {
-              $sum: {
-                $cond: [
-                  {
-                    $and: [
-                      { $eq: ["$receiver._id", new mongoose.Types.ObjectId(userId)] },
-                      { $eq: ["$read", false] }
-                    ]
-                  },
-                  1,
-                  0
-                ]
-              }
-            }
-          }
-        },
-        {
-          $sort: { lastMessageAt: -1 }
-        }
-      ]);
-
-      res.json({ conversations });
-    } catch (err) {
-      console.error('GET CONVERSATIONS ERROR:', err);
-      res.status(500).json({ message: 'Server error.' });
-    }
-  });
-
-  app.get('/messages/:userId/:targetUserId', async (req, res) => {
-    try {
-      const { userId, targetUserId } = req.params;
-      
-      if (!helpers.isValidObjectId(userId) || !helpers.isValidObjectId(targetUserId)) {
-        return res.status(400).json({ message: 'Invalid user IDs.' });
-      }
-
-      const messages = await Message.find({
-        $or: [
-          {
-            'sender._id': userId,
-            'receiver._id': targetUserId
-          },
-          {
-            'sender._id': targetUserId,
-            'receiver._id': userId
-          }
-        ]
-      })
-      .sort({ createdAt: 1 })
-      .lean();
-
-      await Message.updateMany(
-        {
-          'receiver._id': userId,
-          'sender._id': targetUserId,
-          read: false
-        },
-        { read: true }
-      );
-
-      res.json({ messages });
-    } catch (err) {
-      console.error('GET MESSAGES ERROR:', err);
-      res.status(500).json({ message: 'Server error.' });
-    }
-  });
-
-  app.post('/send-message', async (req, res) => {
-    try {
-      const { senderId, receiverId, text } = req.body;
-
-      if (!senderId || !receiverId || !text) {
-        return res.status(400).json({ message: 'All fields are required.' });
-      }
-      if (senderId === receiverId) {
-        return res.status(400).json({ message: 'Cannot send message to yourself.' });
-      }
-      if (!helpers.isValidObjectId(senderId) || !helpers.isValidObjectId(receiverId)) {
-        return res.status(400).json({ message: 'Invalid user IDs.' });
-      }
-
-      const [sender, receiver] = await Promise.all([
-        User.findById(senderId).lean(),
-        User.findById(receiverId).lean()
-      ]);
-
-      if (!sender || !receiver) {
-        return res.status(404).json({ message: 'User not found.' });
-      }
-
-      const newMessage = new Message({
-        text: text.trim(),
-        sender: {
-          _id: sender._id,
-          name: sender.name,
-          profilePicture: sender.profilePicture
-        },
-        receiver: {
-          _id: receiver._id,
-          name: receiver.name,
-          profilePicture: receiver.profilePicture
-        }
-      });
-
-      await newMessage.save();
-
-      await helpers.createNotification(
-        receiverId,
-        'new_message',
-        `${sender.name} sent you a message`,
-        sender
-      );
-
-      res.json({
-        message: 'Message sent',
-        messageId: newMessage._id
-      });
-    } catch (err) {
-      console.error('SEND MESSAGE ERROR:', err);
-      res.status(500).json({ message: 'Server error.' });
-    }
-  });
-
-  // --- Profile Update Routes ---
-  app.put('/update-bio/:userId', async (req, res) => {
-    try {
-      const { userId } = req.params;
-      const { bio } = req.body;
-      
-      if (!helpers.isValidObjectId(userId)) {
-        return res.status(400).json({ message: 'Invalid user ID.' });
-      }
-
-      const user = await User.findByIdAndUpdate(
-        userId, 
-        { bio: bio || '' }, 
-        { new: true }
-      );
-
-      if (!user) {
-        return res.status(404).json({ message: 'User not found.' });
-      }
-      
-      res.json({ bio: user.bio });
-    } catch (err) {
-      console.error('UPDATE BIO ERROR:', err);
-      res.status(500).json({ message: 'Server error.' });
-    }
-  });
-
-app.put('/update-profile-picture/:userId', upload.single('profilePicture'), async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    if (!helpers.isValidObjectId(userId)) {
-      return res.status(400).json({ message: 'Invalid user ID.' });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ message: 'Profile picture is required.' });
-    }
-
-    // Update user profile picture
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { profilePicture: `/uploads/${req.file.filename}` },
-      { new: true }
-    );
-
-    if (!updatedUser) {
-      return res.status(404).json({ message: 'User not found.' });
-    }
-
-    res.json({
-      message: 'Profile picture updated successfully',
-      profilePicture: updatedUser.profilePicture
-    });
-  } catch (err) {
-    console.error('UPDATE PROFILE PICTURE ERROR:', err);
-    res.status(500).json({ message: 'Server error.' });
-  }
-});
-
-
-  // --- Delete Post Route ---
   app.delete('/posts/:postId', async (req, res) => {
     try {
       const { postId } = req.params;

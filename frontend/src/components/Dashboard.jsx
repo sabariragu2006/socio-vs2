@@ -1,5 +1,6 @@
 // src/components/Dashboard.jsx
 import React, { useEffect, useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 import FeedSection from './dashboard/FeedSection';
 import ProfileModal from './dashboard/ProfileModal';
@@ -104,11 +105,21 @@ const Dashboard = ({ user, onLogout }) => {
           setPosts([]);
         }
       } else {
-        // For non-authenticated users, try to get some sample posts
-        // We can create a temporary user ID or fetch from a specific user
-        // Let's try to fetch posts from any user as a fallback
-        console.log('No user authenticated, showing empty feed');
-        setPosts([]);
+        // For non-authenticated users, fetch public/all posts
+   const response = await fetch(`${API_BASE_URL.trim()}/posts/public`, {
+  method: 'GET',
+  credentials: 'include'
+});
+
+        
+        if (response.ok) {
+          const data = await response.json();
+          setPosts(data.posts || []);
+          console.log('Loaded public posts for non-authenticated user:', data.posts?.length || 0);
+        } else {
+          console.log('Failed to fetch public posts');
+          setPosts([]);
+        }
       }
     } catch (err) {
       console.error('Error fetching posts:', err);
